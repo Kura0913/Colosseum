@@ -62,7 +62,88 @@ let Tyler Fedrizzi know!
 This project is released under the MIT License. Please review the [License file](LICENSE) for more details.
 
 
-## Fisheye(modify by kura0913)
+## Panorama and Fisheye
+### Indroduction
+Add new image type to Airsim.
+
+Refer to [this page](http://www.huyaoyu.com/technical/2021/04/29/modify-airsim.html) to rewrite the airsim plugin.
+### Usage
+
+Add the following content to settings.json:
+```json
+{
+  "SeeDocsAt": "https://github.com/Microsoft/AirSim/blob/main/docs/settings.md",
+  "SettingsVersion": 1.2,
+  "//": "SimMode:Car,Multirotor,ComputerVision",
+  "SimMode": "Multirotor",
+  "LogMessagesVisible": false,  
+  "CameraDefaults": {
+    "CaptureSettings": [
+      {
+        "ImageType": 0,
+        "Width": 1920,
+        "Height": 1080,
+        "FOV_Degrees": 90,
+        "AutoExposureSpeed": 100,
+        "AutoExposureBias": 0,
+        "AutoExposureMaxBrightness": 0.64,
+        "AutoExposureMinBrightness": 0.03,
+        "MotionBlurAmount": 0,
+        "TargetGamma": 1.0,
+        "ProjectionMode": "",
+        "OrthoWidth": 5.12
+      },
+      {
+        "ImageType": 1,
+        "Width": 1920,
+        "Height": 1080
+      },
+      {
+        "ImageType": 3,
+        "Width": 1920,
+        "Height": 1080
+      },
+      {
+        "ImageType": 5,
+        "Width": 1920,
+        "Height": 1080
+      },
+      {
+        "ImageType": 10,
+        "Width": 1920,
+        "Height": 1080
+      }
+    ]
+  },
+  "PawnPaths": {
+    "BareboneCar": {"PawnBP": "Class'/AirSim/VehicleAdv/Vehicle/VehicleAdvPawn.VehicleAdvPawn_C'"},
+    "DefaultCar": {"PawnBP": "Class'/AirSim/VehicleAdv/SUV/SuvCarPawn.SuvCarPawn_C'"},
+    "DefaultQuadrotor": {"PawnBP": "Class'/AirSim/Blueprints/BP_FlyingPawn.BP_FlyingPawn_C'"},
+    "DefaultComputerVision": {"PawnBP": "Class'/AirSim/Blueprints/BP_ComputerVisionPawn.BP_ComputerVisionPawn_C'"}
+
+  }
+}
 
 
+```
+New image type: CubeScene
 
+If you want to get panorama image by airsim API, you can use following code to get the image:
+```python
+import airsim
+import cv2
+
+client = airsim.VehicleClient()
+client.confirmConnection()
+
+cv2.imwrite('fisheye.jpg', cv2.imdecode(airsim.string_to_uint8_array(client.simGetImage("0", airsim.ImageType.CubeScene)), cv2.IMREAD_COLOR))
+```
+
+or you can run the sample code under the path: **.\Colosseum\PythonClient\fisheye\\**
+
+Panorama image:
+<div style="display:inline-block">
+<center class='half'>
+<image src="https://github.com/Kura0913/Colosseum/tree/fisheye/PythonClient/fisheye/fisheye_example.png" alt="image1">
+</center>
+</div>
