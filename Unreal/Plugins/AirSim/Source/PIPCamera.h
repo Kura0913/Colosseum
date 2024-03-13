@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Components/SceneCaptureComponentCube.h"
 #include "Camera/CameraActor.h"
 #include "Materials/Material.h"
 #include "Runtime/Core/Public/PixelFormat.h"
@@ -29,6 +30,9 @@ public:
     typedef msr::airlib::ImageCaptureBase::ImageType ImageType;
     typedef msr::airlib::AirSimSettings AirSimSettings;
     typedef AirSimSettings::CameraSetting CameraSetting;
+
+    //Cube
+    typedef msr::airlib::ImageCaptureBase ImageCaptureBase;
 
     APIPCamera(const FObjectInitializer& ObjectInitializer); //CinemAirSim
 
@@ -80,6 +84,11 @@ public:
     UTextureRenderTarget2D* getRenderTarget(const ImageType type, bool if_active);
     UDetectionComponent* getDetectionComponent(const ImageType type, bool if_active) const;
 
+    // Cube.
+    USceneCaptureComponentCube* getCaptureComponentCube(const ImageType type, bool if_active);
+    UTextureRenderTargetCube* getRenderTargetCube(const ImageType type, bool if_active);
+    USceneCaptureComponent* getCaptureComponentGeneral(const ImageType type, bool if_active);
+
     msr::airlib::Pose getPose() const;
 
 private: //members
@@ -94,6 +103,12 @@ private: //members
     TArray<UTextureRenderTarget2D*> render_targets_;
     UPROPERTY()
     TArray<UDetectionComponent*> detections_;
+
+    // Cube.
+    UPROPERTY() 
+    TArray<USceneCaptureComponentCube*> captures_cube_;
+    UPROPERTY() 
+    TArray<UTextureRenderTargetCube*> render_targets_cube_;
 
     //CinemAirSim
     UPROPERTY()
@@ -123,10 +138,20 @@ private: //methods
     typedef AirSimSettings::NoiseSetting NoiseSetting;
 
     static unsigned int imageTypeCount();
+
+    //Cube.
+    static unsigned int imageTypeCount2D();
+    static unsigned int cubeTypeCount();
+
     void enableCaptureComponent(const ImageType type, bool is_enabled);
     static void updateCaptureComponentSetting(USceneCaptureComponent2D* capture, UTextureRenderTarget2D* render_target,
                                               bool auto_format, const EPixelFormat& pixel_format, const CaptureSetting& setting, const NedTransform& ned_transform,
                                               bool force_linear_gamma);
+    // Cube.
+    static void updateCaptureComponentSettingCube(USceneCaptureComponentCube* capture, UTextureRenderTargetCube* render_target,
+        bool auto_format, const EPixelFormat& pixel_format, const CaptureSetting& setting,
+        bool force_linear_gamma);
+
     void setNoiseMaterial(int image_type, UObject* outer, FPostProcessSettings& obj, const NoiseSetting& settings);
     void setDistortionMaterial(int image_type, UObject* outer, FPostProcessSettings& obj);
     static void updateCameraPostProcessingSetting(FPostProcessSettings& obj, const CaptureSetting& setting);

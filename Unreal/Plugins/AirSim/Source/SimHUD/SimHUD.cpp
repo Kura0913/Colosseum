@@ -94,6 +94,40 @@ void ASimHUD::inputEventToggleTrace()
     simmode_->toggleTraceAll();
 }
 
+ASimHUD::ImageType ASimHUD::getSubwindowCameraType(int window_index)
+{
+    //TODO: index check
+    return getSubWindowSettings().at(window_index).image_type;
+}
+
+void ASimHUD::setSubwindowCameraType(int window_index, ImageType type)
+{
+    getSubWindowSettings().at(window_index).image_type = type;
+    updateWidgetSubwindowVisibility();
+}
+
+APIPCamera* ASimHUD::getSubwindowCamera(int window_index)
+{
+    return subwindow_cameras_[window_index]; //TODO: index check
+}
+
+void ASimHUD::setSubwindowCamera(int window_index, APIPCamera* camera)
+{
+    subwindow_cameras_[window_index] = camera; //TODO: index check
+    updateWidgetSubwindowVisibility();
+}
+
+bool ASimHUD::getSubwindowVisible(int window_index)
+{
+    return getSubWindowSettings().at(window_index).visible;
+}
+
+void ASimHUD::setSubwindowVisible(int window_index, bool is_visible)
+{
+    getSubWindowSettings().at(window_index).visible = is_visible;
+    updateWidgetSubwindowVisibility();
+}
+
 void ASimHUD::updateWidgetSubwindowVisibility()
 {
     for (int window_index = 0; window_index < AirSimSettings::kSubwindowCount; ++window_index) {
@@ -127,16 +161,19 @@ void ASimHUD::toggleSubwindowVisibility(int window_index)
 
 void ASimHUD::inputEventToggleSubwindow0()
 {
+    getSubWindowSettings().at(0).visible = !getSubWindowSettings().at(0).visible;
     toggleSubwindowVisibility(0);
 }
 
 void ASimHUD::inputEventToggleSubwindow1()
 {
+    getSubWindowSettings().at(1).visible = !getSubWindowSettings().at(1).visible;
     toggleSubwindowVisibility(1);
 }
 
 void ASimHUD::inputEventToggleSubwindow2()
 {
+    getSubWindowSettings().at(2).visible = !getSubWindowSettings().at(2).visible;
     toggleSubwindowVisibility(2);
 }
 

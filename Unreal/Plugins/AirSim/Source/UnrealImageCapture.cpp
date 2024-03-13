@@ -29,6 +29,46 @@ void UnrealImageCapture::getImages(const std::vector<msr::airlib::ImageCaptureBa
         getSceneCaptureImage(requests, responses, false);
 }
 
+static void addNewRenderParams(
+    APIPCamera* camera,
+    const msr::airlib::ImageCaptureBase::ImageRequest& request,
+    msr::airlib::ImageCaptureBase::ImageResponse& response,
+    std::vector<std::shared_ptr<RenderRequest::RenderParams>>& render_params) {
+
+    UTextureRenderTarget2D* textureTarget = nullptr;
+    USceneCaptureComponent2D* capture = camera->getCaptureComponent(request.image_type, false);
+    if (capture == nullptr) {
+        response.message = "Can't take screenshot because none camera type is not active";
+    }
+    else if (capture->TextureTarget == nullptr) {
+        response.message = "Can't take screenshot because texture target is null";
+    }
+    else
+        textureTarget = capture->TextureTarget;
+
+    render_params.push_back(std::make_shared<RenderRequest::RenderParams>(capture, textureTarget, request.pixels_as_float, request.compress));
+}
+
+static void addNewRenderParamsCube(
+    APIPCamera* camera,
+    const msr::airlib::ImageCaptureBase::ImageRequest& request,
+    msr::airlib::ImageCaptureBase::ImageResponse& response,
+    std::vector<std::shared_ptr<RenderRequest::RenderParams>>& render_params) {
+
+    UTextureRenderTargetCube* textureTarget = nullptr;
+    USceneCaptureComponentCube* capture = camera->getCaptureComponentCube(request.image_type, false);
+    if (capture == nullptr) {
+        response.message = "Can't take screenshot because none camera type is not active";
+    }
+    else if (capture->TextureTarget == nullptr) {
+        response.message = "Can't take screenshot because texture target is null";
+    }
+    else
+        textureTarget = capture->TextureTarget;
+
+    render_params.push_back(std::make_shared<RenderRequest::RenderParams>(capture, textureTarget, request.pixels_as_float, request.compress));
+}
+
 void UnrealImageCapture::getSceneCaptureImage(const std::vector<msr::airlib::ImageCaptureBase::ImageRequest>& requests,
                                               std::vector<msr::airlib::ImageCaptureBase::ImageResponse>& responses, bool use_safe_method) const
 {
@@ -58,18 +98,25 @@ void UnrealImageCapture::getSceneCaptureImage(const std::vector<msr::airlib::Ima
         responses.push_back(ImageResponse());
         ImageResponse& response = responses.at(i);
 
-        UTextureRenderTarget2D* textureTarget = nullptr;
-        USceneCaptureComponent2D* capture = camera->getCaptureComponent(requests[i].image_type, false);
-        if (capture == nullptr) {
-            response.message = "Can't take screenshot because none camera type is not active";
-        }
-        else if (capture->TextureTarget == nullptr) {
-            response.message = "Can't take screenshot because texture target is null";
-        }
-        else
-            textureTarget = capture->TextureTarget;
+        //UTextureRenderTarget2D* textureTarget = nullptr;
+        //USceneCaptureComponent2D* capture = camera->getCaptureComponent(requests[i].image_type, false);
+        //if (capture == nullptr) {
+        //    response.message = "Can't take screenshot because none camera type is not active";
+        //}
+        //else if (capture->TextureTarget == nullptr) {
+        //    response.message = "Can't take screenshot because texture target is null";
+        //}
+        //else
+        //    textureTarget = capture->TextureTarget;
 
-        render_params.push_back(std::make_shared<RenderRequest::RenderParams>(capture, textureTarget, requests[i].pixels_as_float, requests[i].compress));
+        //render_params.push_back(std::make_shared<RenderRequest::RenderParams>(capture, textureTarget, requests[i].pixels_as_float, requests[i].compress));
+        
+        if (!ImageCaptureBase::isCubeType(requests[i].image_type)) {
+            addNewRenderParams(camera, requests[i], response, render_params);
+        }
+        else {
+            addNewRenderParamsCube(camera, requests[i], response, render_params);
+        }
     }
 
     if (nullptr == gameViewport) {

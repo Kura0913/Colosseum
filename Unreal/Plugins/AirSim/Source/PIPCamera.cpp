@@ -1,8 +1,10 @@
 #include "PIPCamera.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "Components/SceneCaptureComponentCube.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
+#include "Engine/TextureRenderTargetCube.h"
 #include "Engine/World.h"
 #include "ImageUtils.h"
 
@@ -47,6 +49,9 @@ APIPCamera::APIPCamera(const FObjectInitializer& ObjectInitializer)
     image_type_to_pixel_format_map_.Add(Utils::toNumeric(ImageType::OpticalFlow), EPixelFormat::PF_B8G8R8A8);
     image_type_to_pixel_format_map_.Add(Utils::toNumeric(ImageType::OpticalFlowVis), EPixelFormat::PF_B8G8R8A8);
 
+    // Cube.
+    image_type_to_pixel_format_map_.Add(10, EPixelFormat::PF_B8G8R8A8);    // Cube scene.
+    image_type_to_pixel_format_map_.Add(11, EPixelFormat::PF_FloatRGBA);   // Cube depth.
     object_filter_ = FObjectFilter();
 }
 
@@ -81,6 +86,14 @@ void APIPCamera::PostInitializeComponents()
     captures_[Utils::toNumeric(ImageType::OpticalFlowVis)] =
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponent2D>(this, TEXT("OpticalFlowVisCaptureComponent"));
 
+    // Cube.
+    captures_cube_.Init(nullptr, cubeTypeCount());
+    render_targets_cube_.Init(nullptr, cubeTypeCount());
+    captures_cube_[ImageCaptureBase::getCubeTypeIndex(ImageType::CubeScene)] =
+        UAirBlueprintLib::GetActorComponent<USceneCaptureComponentCube>(this, TEXT("CubeSceneCaptureComponent"));
+    captures_cube_[ImageCaptureBase::getCubeTypeIndex(ImageType::CubeDepth)] =
+        UAirBlueprintLib::GetActorComponent<USceneCaptureComponentCube>(this, TEXT("CubeDepthCaptureComponent"));
+
     for (unsigned int i = 0; i < imageTypeCount(); ++i) {
         detections_[i] = NewObject<UDetectionComponent>(this);
         if (detections_[i]) {
@@ -97,17 +110,23 @@ void APIPCamera::BeginPlay()
 {
     Super::BeginPlay();
 
-    noise_materials_.AddZeroed(imageTypeCount() + 1);
-    distortion_materials_.AddZeroed(imageTypeCount() + 1);
+    noise_materials_.AddZeroed(imageTypeCount2D() + 1);
+    distortion_materials_.AddZeroed(imageTypeCount2D() + 1);
 
     //by default all image types are disabled
     camera_type_enabled_.assign(imageTypeCount(), false);
 
-    for (unsigned int image_type = 0; image_type < imageTypeCount(); ++image_type) {
+    for (unsigned int image_type = 0; image_type < imageTypeCount2D(); ++image_type) {
         //use final color for all calculations
         captures_[image_type]->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 
         render_targets_[image_type] = NewObject<UTextureRenderTarget2D>();
+    }
+
+    // Cube.
+    for (unsigned int cube_type = 0; cube_type < cubeTypeCount(); ++cube_type) {
+        // Capture sources are defined in the Blue Print.
+        render_targets_cube_[cube_type] = NewObject<UTextureRenderTargetCube>();
     }
 
     //We set all cameras to start as nodisplay
@@ -124,6 +143,11 @@ void APIPCamera::BeginPlay()
 
 msr::airlib::ProjectionMatrix APIPCamera::getProjectionMatrix(const APIPCamera::ImageType image_type) const
 {
+
+    verifyf(!ImageCaptureBase::isCubeType(image_type),
+        TEXT("APIPCamera::getProjectionMatrix(): Cube type not supported. Cube type index %d. "),
+        ImageCaptureBase::getCubeTypeIndex(image_type));
+
     msr::airlib::ProjectionMatrix mat;
 
     //TODO: avoid the need to override const cast here
@@ -223,7 +247,7 @@ void APIPCamera::Tick(float DeltaTime)
 void APIPCamera::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
     if (noise_materials_.Num()) {
-        for (unsigned int image_type = 0; image_type < imageTypeCount(); ++image_type) {
+        for (unsigned int image_type = 0; image_type < imageTypeCount2D(); ++image_type) {
             if (noise_materials_[image_type + 1])
                 captures_[image_type]->PostProcessSettings.RemoveBlendable(noise_materials_[image_type + 1]);
         }
@@ -235,7 +259,7 @@ void APIPCamera::EndPlay(const EEndPlayReason::Type EndPlayReason)
     noise_materials_.Empty();
 
     if (distortion_materials_.Num()) {
-        for (unsigned int image_type = 0; image_type < imageTypeCount(); ++image_type) {
+        for (unsigned int image_type = 0; image_type < imageTypeCount2D(); ++image_type) {
             if (distortion_materials_[image_type + 1])
                 captures_[image_type]->PostProcessSettings.RemoveBlendable(distortion_materials_[image_type + 1]);
         }
@@ -246,17 +270,34 @@ void APIPCamera::EndPlay(const EEndPlayReason::Type EndPlayReason)
     distortion_material_static_ = nullptr;
     distortion_materials_.Empty();
 
-    for (unsigned int image_type = 0; image_type < imageTypeCount(); ++image_type) {
+    for (unsigned int image_type = 0; image_type < imageTypeCount2D(); ++image_type) {
         //use final color for all calculations
         captures_[image_type] = nullptr;
         render_targets_[image_type] = nullptr;
         detections_[image_type] = nullptr;
+    }
+
+    // Cube.
+    for (unsigned int cube_type = 0; cube_type < cubeTypeCount(); ++cube_type) {
+        captures_cube_[cube_type] = nullptr;
+        render_targets_cube_[cube_type] = nullptr;
     }
 }
 
 unsigned int APIPCamera::imageTypeCount()
 {
     return Utils::toNumeric(ImageType::Count);
+}
+
+unsigned int APIPCamera::imageTypeCount2D()
+{
+    return Utils::toNumeric(ImageType::Count) - cubeTypeCount();
+}
+
+
+unsigned int APIPCamera::cubeTypeCount()
+{
+    return Utils::toNumeric(ImageType::CubeDepth) - Utils::toNumeric(ImageType::CubeScene) + 1;
 }
 
 void APIPCamera::showToScreen()
@@ -318,8 +359,8 @@ void APIPCamera::setCameraPose(const msr::airlib::Pose& relative_pose)
 
 void APIPCamera::setCameraFoV(float fov_degrees)
 {
-    int image_count = static_cast<int>(Utils::toNumeric(ImageType::Count));
-    for (int image_type = 0; image_type < image_count; ++image_type) {
+    // int image_count = static_cast<int>(Utils::toNumeric(ImageType::Count));
+    for (int image_type = 0; image_type < static_cast<int>(imageTypeCount2D()); ++image_type) {
         captures_[image_type]->FOVAngle = fov_degrees;
     }
 
@@ -388,25 +429,34 @@ void APIPCamera::setupCameraFromSettings(const APIPCamera::CameraSetting& camera
                 pixel_format = static_cast<EPixelFormat>(pixel_format_override->second.pixel_format);
             }
             pixel_format = (pixel_format == EPixelFormat::PF_Unknown ? image_type_to_pixel_format_map_[image_type] : pixel_format);
+            if (!ImageCaptureBase::isCubeType(image_type)) {
+                switch (Utils::toEnum<ImageType>(image_type)) {
+                case ImageType::Scene:
+                case ImageType::Infrared:
+                    updateCaptureComponentSetting(captures_[image_type], render_targets_[image_type], false, pixel_format, capture_setting, ned_transform, false);
+                    break;
 
-            switch (Utils::toEnum<ImageType>(image_type)) {
-            case ImageType::Scene:
-            case ImageType::Infrared:
-                updateCaptureComponentSetting(captures_[image_type], render_targets_[image_type], false, pixel_format, capture_setting, ned_transform, false);
-                break;
+                case ImageType::Segmentation:
+                case ImageType::SurfaceNormals:
+                    updateCaptureComponentSetting(captures_[image_type], render_targets_[image_type], true, pixel_format, capture_setting, ned_transform, true);
+                    break;
 
-            case ImageType::Segmentation:
-            case ImageType::SurfaceNormals:
-                updateCaptureComponentSetting(captures_[image_type], render_targets_[image_type], true, pixel_format, capture_setting, ned_transform, true);
-                break;
-
-            default:
-                updateCaptureComponentSetting(captures_[image_type], render_targets_[image_type], true, pixel_format, capture_setting, ned_transform, false);
-                break;
+                default:
+                    updateCaptureComponentSetting(captures_[image_type], render_targets_[image_type], true, pixel_format, capture_setting, ned_transform, false);
+                    break;
+                }
+                setDistortionMaterial(image_type, captures_[image_type], captures_[image_type]->PostProcessSettings);
+                setNoiseMaterial(image_type, captures_[image_type], captures_[image_type]->PostProcessSettings, noise_setting);
+                copyCameraSettingsToSceneCapture(camera_, captures_[image_type]); //CinemAirSim
             }
-            setDistortionMaterial(image_type, captures_[image_type], captures_[image_type]->PostProcessSettings);
-            setNoiseMaterial(image_type, captures_[image_type], captures_[image_type]->PostProcessSettings, noise_setting);
-            copyCameraSettingsToSceneCapture(camera_, captures_[image_type]); //CinemAirSim
+            else {
+                const int cube_type = ImageCaptureBase::getCubeTypeIndex(image_type);
+                updateCaptureComponentSettingCube(captures_cube_[cube_type], render_targets_cube_[cube_type], false,
+                    image_type_to_pixel_format_map_[image_type], capture_setting,
+                    false);
+                // No noise setting for cubes.
+            }
+            
         }
         else { //camera component
             updateCameraSetting(camera_, capture_setting, ned_transform);
@@ -440,6 +490,28 @@ void APIPCamera::updateCaptureComponentSetting(USceneCaptureComponent2D* capture
 
     updateCameraPostProcessingSetting(capture->PostProcessSettings, setting);
 }
+
+void APIPCamera::updateCaptureComponentSettingCube(USceneCaptureComponentCube* capture, UTextureRenderTargetCube* render_target,
+    bool auto_format, const EPixelFormat& pixel_format, const CaptureSetting& setting,
+    bool force_linear_gamma) {
+    if (auto_format)
+    {
+        render_target->InitAutoFormat(setting.width);
+    }
+    else
+    {
+        render_target->Init(setting.width, pixel_format);
+        render_target->bForceLinearGamma = force_linear_gamma;
+    }
+
+    // render_target->bHDR = false;
+
+    if (!std::isnan(setting.target_gamma)) {
+        render_target->TargetGamma = setting.target_gamma;
+        // UE_LOG(LogTemp, Warning, TEXT("render_target->TargetGamma = %f. "), render_target->TargetGamma);
+    }
+}
+
 
 //CinemAirSim
 void APIPCamera::updateCameraSetting(UCineCameraComponent* camera, const CaptureSetting& setting, const NedTransform& ned_transform)
@@ -540,33 +612,54 @@ void APIPCamera::setNoiseMaterial(int image_type, UObject* outer, FPostProcessSe
 
 void APIPCamera::enableCaptureComponent(const APIPCamera::ImageType type, bool is_enabled)
 {
-    USceneCaptureComponent2D* capture = getCaptureComponent(type, false);
-    if (capture != nullptr) {
-        UDetectionComponent* detection = getDetectionComponent(type, false);
-        if (is_enabled) {
-            //do not make unnecessary calls to Activate() which otherwise causes crash in Unreal
-            if (!capture->IsActive() || capture->TextureTarget == nullptr) {
-                capture->TextureTarget = getRenderTarget(type, false);
-                capture->Activate();
-                if (detection != nullptr) {
-                    detection->texture_target_ = capture->TextureTarget;
-                    detection->Activate();
+    if (!ImageCaptureBase::isCubeType(type)) {
+        USceneCaptureComponent2D* capture = getCaptureComponent(type, false);
+        if (capture != nullptr) {
+            UDetectionComponent* detection = getDetectionComponent(type, false);
+            if (is_enabled) {
+                //do not make unnecessary calls to Activate() which otherwise causes crash in Unreal
+                if (!capture->IsActive() || capture->TextureTarget == nullptr) {
+                    capture->TextureTarget = getRenderTarget(type, false);
+                    capture->Activate();
+                    if (detection != nullptr) {
+                        detection->texture_target_ = capture->TextureTarget;
+                        detection->Activate();
+                    }
                 }
             }
-        }
-        else {
-            if (capture->IsActive() || capture->TextureTarget != nullptr) {
-                capture->Deactivate();
-                capture->TextureTarget = nullptr;
-                if (detection != nullptr) {
-                    detection->Deactivate();
-                    detection->texture_target_ = nullptr;
+            else {
+                if (capture->IsActive() || capture->TextureTarget != nullptr) {
+                    capture->Deactivate();
+                    capture->TextureTarget = nullptr;
+                    if (detection != nullptr) {
+                        detection->Deactivate();
+                        detection->texture_target_ = nullptr;
+                    }
                 }
             }
+            camera_type_enabled_[Utils::toNumeric(type)] = is_enabled;
         }
-        camera_type_enabled_[Utils::toNumeric(type)] = is_enabled;
+        //else nothing to enable
     }
-    //else nothing to enable
+    else {
+        USceneCaptureComponentCube* capture = getCaptureComponentCube(type, false);
+        if (capture != nullptr) {
+            if (is_enabled) {
+                //do not make unnecessary calls to Activate() which otherwise causes crash in Unreal
+                if (!capture->IsActive() || capture->TextureTarget == nullptr) {
+                    capture->TextureTarget = getRenderTargetCube(type, false);
+                    capture->Activate();
+                }
+            }
+            else {
+                if (capture->IsActive() || capture->TextureTarget != nullptr) {
+                    capture->Deactivate();
+                    capture->TextureTarget = nullptr;
+                }
+            }
+            camera_type_enabled_[Utils::toNumeric(type)] = is_enabled;
+        }
+    }
 }
 
 UTextureRenderTarget2D* APIPCamera::getRenderTarget(const APIPCamera::ImageType type, bool if_active)
@@ -575,6 +668,16 @@ UTextureRenderTarget2D* APIPCamera::getRenderTarget(const APIPCamera::ImageType 
 
     if (!if_active || camera_type_enabled_[image_type])
         return render_targets_[image_type];
+    return nullptr;
+}
+
+UTextureRenderTargetCube* APIPCamera::getRenderTargetCube(const APIPCamera::ImageType type, bool if_active)
+{
+    const unsigned int image_type = Utils::toNumeric(type);
+    const unsigned int cube_type = ImageCaptureBase::getCubeTypeIndex(type);
+
+    if (!if_active || camera_type_enabled_[image_type])
+        return render_targets_cube_[cube_type];
     return nullptr;
 }
 
@@ -594,6 +697,26 @@ USceneCaptureComponent2D* APIPCamera::getCaptureComponent(const APIPCamera::Imag
     if (!if_active || camera_type_enabled_[image_type])
         return captures_[image_type];
     return nullptr;
+}
+
+USceneCaptureComponentCube* APIPCamera::getCaptureComponentCube(const APIPCamera::ImageType type, bool if_active)
+{
+    const unsigned int image_type = Utils::toNumeric(type);
+    const unsigned int cube_type = ImageCaptureBase::getCubeTypeIndex(type);
+
+    if (!if_active || camera_type_enabled_[image_type])
+        return captures_cube_[cube_type];
+    return nullptr;
+}
+
+USceneCaptureComponent* APIPCamera::getCaptureComponentGeneral(const APIPCamera::ImageType type, bool if_active)
+{
+    if (ImageCaptureBase::isCubeType(type)) {
+        return getCaptureComponentCube(type, if_active);
+    }
+    else {
+        return getCaptureComponent(type, if_active);
+    }
 }
 
 void APIPCamera::disableAllPIP()
@@ -617,7 +740,15 @@ void APIPCamera::onViewModeChanged(bool nodisplay)
     for (unsigned int image_type = 0; image_type < imageTypeCount(); ++image_type) {
         USceneCaptureComponent2D* capture = getCaptureComponent(static_cast<ImageType>(image_type), false);
         if (capture) {
-            setCaptureUpdate(capture, nodisplay);
+            //setCaptureUpdate(capture, nodisplay);
+            if (nodisplay) {
+                capture->bCaptureEveryFrame = false;
+                capture->bCaptureOnMovement = false;
+            }
+            else {
+                capture->bCaptureEveryFrame = true;
+                capture->bCaptureOnMovement = true;
+            }
         }
     }
 }

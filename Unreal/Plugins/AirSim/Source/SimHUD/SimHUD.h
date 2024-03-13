@@ -24,6 +24,9 @@ public:
     typedef msr::airlib::ImageCaptureBase::ImageType ImageType;
     typedef msr::airlib::AirSimSettings AirSimSettings;
 
+    // Cube.
+    typedef msr::airlib::ImageCaptureBase ImageCaptureBase;
+
 public:
     void inputEventToggleRecording();
     void inputEventToggleReport();
@@ -33,6 +36,13 @@ public:
     void inputEventToggleSubwindow1();
     void inputEventToggleSubwindow2();
     void inputEventToggleAll();
+
+    ImageType getSubwindowCameraType(int window_index);
+    void setSubwindowCameraType(int window_index, ImageType type);
+    APIPCamera* getSubwindowCamera(int window_index);
+    void setSubwindowCamera(int window_index, APIPCamera* camera);
+    bool getSubwindowVisible(int window_index);
+    void setSubwindowVisible(int window_index, bool is_visible);
 
     ASimHUD();
     virtual void BeginPlay() override;

@@ -26,8 +26,17 @@ UDetectionComponent::UDetectionComponent()
 void UDetectionComponent::BeginPlay()
 {
     Super::BeginPlay();
-    scene_capture_component_2D_ = CastChecked<USceneCaptureComponent2D>(GetAttachParent());
-    object_filter_ = FObjectFilter();
+    //try {
+    //    is_cube_[component_cnt_] = false;
+    //    scene_capture_component_2D_ = CastChecked<USceneCaptureComponent2D>(GetAttachParent());
+    //}
+    //catch (...) {
+    //    is_cube_[component_cnt_] = true;
+    //    scene_capture_component_cube_ = CastChecked<USceneCaptureComponentCube>(GetAttachParent());
+    //}
+    //component_cnt_++;
+
+    //object_filter_ = FObjectFilter();
 }
 
 void UDetectionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

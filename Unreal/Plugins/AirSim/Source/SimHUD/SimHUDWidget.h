@@ -32,6 +32,7 @@ public:
     //bool even when not needed because of Unreal quirk that if return value
     //is not there then below are treated as events instead of overridable functions
     UFUNCTION(BlueprintImplementableEvent, Category = "C++ Interface")
+    //bool setSubwindowVisibility(int window_index, bool is_visible, UTexture* render_target);
     bool setSubwindowVisibility(int window_index, bool is_visible, UTextureRenderTarget2D* render_target);
     UFUNCTION(BlueprintImplementableEvent, Category = "C++ Interface")
     int getSubwindowVisibility(int window_index);

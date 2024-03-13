@@ -4,6 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Components/SceneComponent.h"
+#include "Components/SceneCaptureComponent.h"
+#include "Components/SceneCaptureComponent2D.h"
+#include "Components/SceneCaptureComponentCube.h"
 #include "ObjectFilter.h"
 #include "DetectionComponent.generated.h"
 
@@ -56,6 +59,13 @@ private:
     FRotator getRelativeRotation(FVector in_location, FRotator in_rotation);
 
 public:
+    //Cube 
+
+    UPROPERTY()
+    int component_cnt_ = 0;
+    UPROPERTY()
+    TArray<bool> is_cube_;
+
     UPROPERTY()
     UTextureRenderTarget2D* texture_target_;
 
@@ -68,6 +78,9 @@ private:
 
     UPROPERTY()
     USceneCaptureComponent2D* scene_capture_component_2D_;
+
+    UPROPERTY()
+    USceneCaptureComponentCube* scene_capture_component_cube_;
 
     UPROPERTY()
     TArray<FDetectionInfo> cached_detections_;
