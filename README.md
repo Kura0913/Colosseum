@@ -141,11 +141,4 @@ cv2.imwrite('fisheye.jpg', cv2.imdecode(airsim.string_to_uint8_array(client.simG
 
 or you can run the sample code under the path: **.\Colosseum\PythonClient\fisheye\\**
 
-Panorama image:
-
-![](https://github.com/Kura0913/Colosseum/tree/fisheye/PythonClient/fisheye/fisheye_example.jpg)
-
-
-<div style="display:inline-block">
-<image src="https://github.com/Kura0913/Colosseum/tree/fisheye/PythonClient/fisheye/fisheye_example.jpg" alt="image1" width="600">
-</div>
+[**Panorama image**](https://github.com/Kura0913/Colosseum/tree/fisheye/PythonClient/fisheye/fisheye_example.jpg)
