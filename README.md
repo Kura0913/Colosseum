@@ -67,6 +67,24 @@ This project is released under the MIT License. Please review the [License file]
 Add new image type to Airsim.
 
 Refer to [this page](http://www.huyaoyu.com/technical/2021/04/29/modify-airsim.html) to rewrite the airsim plugin.
+
+### Modify List
+```
+Source/AirLib/include/common/ImageCaptureBase.hpp
+Source/UnrealImageCapture.cpp
+Source/PIPCamra.h
+Source/PIPCamea.cpp
+Content/Blueprints/BP_PIPCamra.uasset
+Source/RenderRequest.h
+Source/RenderRequest.cpp
+Source/SimHUD/SimHUD.h
+Source/SimHUD/SimHUD.cpp
+Source/SimHUD/SimHUDWidget.h
+Source/DetectionComponent.cpp
+Content/Blueprints/BP_SimHUDWidget.uasset
+Python client(.\Colosseum\PythonClient\airsim\types.py)
+```
+
 ### Usage
 
 Add the following content to settings.json:
