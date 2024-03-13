@@ -143,7 +143,5 @@ or you can run the sample code under the path: **.\Colosseum\PythonClient\fishey
 
 Panorama image:
 <div style="display:inline-block">
-<center class='half'>
-<image src="https://github.com/Kura0913/Colosseum/tree/fisheye/PythonClient/fisheye/fisheye_example.png" alt="image1">
-</center>
+<image src="https://github.com/Kura0913/Colosseum/tree/fisheye/PythonClient/fisheye/fisheye_example.png">
 </div>
