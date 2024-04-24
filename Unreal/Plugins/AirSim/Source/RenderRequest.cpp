@@ -1,11 +1,9 @@
-#include <iostream>
 #include "RenderRequest.h"
 #include "CubemapUnwrapUtils.h"
 #include "TextureResource.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Async/TaskGraphInterfaces.h"
 #include "ImageUtils.h"
-
 #include "AirBlueprintLib.h"
 #include "Async/Async.h"
 
@@ -100,6 +98,7 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
                     // Cube. If render_component only calls the overrided methods, 
                     // we can use polymorphism with virtual function calls.
                     temp_param->render_component_cube->CaptureSceneDeferred();
+                    
                     // Get the raw 8bit data.
                     unWarpTextureRenderTargetCube(temp_param->render_target_cube, results_[i]->cube_raw);
                 }
@@ -128,6 +127,7 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
                             *ptr++ = item.B;
                             *ptr++ = item.G;
                             *ptr++ = item.R;
+
                         }
                     }
                 }
@@ -148,11 +148,10 @@ void RenderRequest::getScreenshot(std::shared_ptr<RenderParams> params[], std::v
            //unWarpTextureRenderTargetCube(params[i]->render_target_cube, results[i]->cube_raw);
 
             if (!params[i]->pixels_as_float) {
-                // RRG 8bit.
                 if (params[i]->compress) {
                     // Compress.
                     compressTArrayAsPng32bit(results[i]->cube_raw, results[i]->cube_image_data,
-                        results[i]->width, results[i]->height, 100);
+                        results[i]->width, results[i]->height, 0);
                     // UAirBlueprintLib::CompressImageArray(results[i]->width, results[i]->height, results[i]->bmp, results[i]->image_data_uint8);
                     // Copy the data from TArray64 to TArray.
                     copyFromTArray2TArray(results[i]->cube_image_data, results[i]->image_data_uint8);

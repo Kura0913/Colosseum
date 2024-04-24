@@ -68,9 +68,50 @@ Add new image type to Airsim.
 
 Refer to [this page](http://www.huyaoyu.com/technical/2021/04/29/modify-airsim.html) to rewrite the airsim plugin.
 
-### Modify List
+In addition, Unreal Engine's **USceneCaptureComponentCube** does not provide post-processing, this function must be added manually to capture Segmentation images.
+
+### Requirement
+* UE5.2 release-version: Please install UE5.2 release-version from [this page](https://github.com/EpicGames/UnrealEngine)
+
+### Modify Source Code
+**Unrea Engine Source code** : Added post-processing components to USceneCaptureComponentCube, and enable post-processing for USceneCaptureComponentCube.
+
+Engine\Source\Runtime\Engine\Classes\Components\SceneCaptureComponentCube.h : add following code.
+
+```cpp
+	UPROPERTY(interp, Category = PostProcessVolume, meta = (ShowOnlyInnerProperties))
+	struct FPostProcessSettings PostProcessSettings;
+
+	/** Range (0.0, 1.0) where 0 indicates no effect, 1 indicates full effect. */
+	UPROPERTY(interp, Category = PostProcessVolume, BlueprintReadWrite, meta = (UIMin = "0.0", UIMax = "1.0"))
+	float PostProcessBlendWeight;
+```
+Engine\Source\Runtime\Renderer\Private\SceneCaptureRendering.cpp : At line 1145, modify the code as following, add the post-processing component we just add.
+
+```cpp
+FSceneRenderer* SceneRenderer = CreateSceneRendererForSceneCapture(
+				this, 
+				CaptureComponent,
+				TextureTarget->GameThread_GetRenderTargetResource(), 
+				CaptureSize, 
+				ViewRotationMatrix,
+				Location, 
+				ProjectionMatrix, 
+				false, 
+				CaptureComponent->MaxViewDistanceOverride,
+				bCaptureSceneColor, 
+				&CaptureComponent->PostProcessSettings,
+				CaptureComponent->PostProcessBlendWeight, 
+				CaptureComponent->GetViewOwner(), faceidx);
+
+```
+
+**AirSim Plugin** : Modify the following files, add USceneCaptureComponentCube to the related functions for capturing images.
+
 ```
 Source/AirLib/include/common/ImageCaptureBase.hpp
+Source/AirBlueprintLab.h
+Source/AirBlueprintLab.cpp
 Source/UnrealImageCapture.cpp
 Source/PIPCamra.h
 Source/PIPCamea.cpp
@@ -85,8 +126,8 @@ Content/Blueprints/BP_SimHUDWidget.uasset
 Python client(.\Colosseum\PythonClient\airsim\types.py)
 ```
 
-### Usage
 
+### settings.json
 Add the following content to settings.json:
 ```json
 {
@@ -128,8 +169,13 @@ Add the following content to settings.json:
       },
       {
         "ImageType": 10,
-        "Width": 1920,
-        "Height": 1080
+        "Width": 960,
+        "Height": 960
+      },
+      {
+        "ImageType": 11,
+        "Width": 960,
+        "Height": 960
       }
     ]
   },
@@ -142,9 +188,9 @@ Add the following content to settings.json:
   }
 }
 
-
 ```
-New image type: CubeScene
+### AirSim API
+New image type: CubeScene, CubeSegmentation
 
 If you want to get panorama image by airsim API, you can use following code to get the image:
 ```python
@@ -154,7 +200,8 @@ import cv2
 client = airsim.VehicleClient()
 client.confirmConnection()
 
-cv2.imwrite('fisheye.jpg', cv2.imdecode(airsim.string_to_uint8_array(client.simGetImage("0", airsim.ImageType.CubeScene)), cv2.IMREAD_COLOR))
+cv2.imwrite('cube_scene.jpg', cv2.imdecode(airsim.string_to_uint8_array(client.simGetImage("0", airsim.ImageType.CubeScene)), cv2.IMREAD_COLOR))
+cv2.imwrite('cube_segmentation.jpg', cv2.imdecode(airsim.string_to_uint8_array(client.simGetImage("0", airsim.ImageType.CubeScene)), cv2.IMREAD_COLOR))
 ```
 
 or you can run the sample code under the path: **.\Colosseum\PythonClient\fisheye\\**

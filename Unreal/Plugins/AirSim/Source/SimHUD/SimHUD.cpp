@@ -142,9 +142,18 @@ void ASimHUD::updateWidgetSubwindowVisibility()
             camera->setCameraTypeUpdate(camera_type, false);
         }
 
-        widget_->setSubwindowVisibility(window_index,
-                                        is_visible,
-                                        is_visible ? camera->getRenderTarget(camera_type, false) : nullptr);
+        if (!ImageCaptureBase::isCubeType(camera_type)) {
+            widget_->setSubwindowVisibility(window_index,
+                is_visible,
+                is_visible ? camera->getRenderTarget(camera_type, false) : nullptr
+            );
+        }
+        else {
+            widget_->setSubwindowVisibility(window_index,
+                is_visible,
+                is_visible ? camera->getRenderTargetCube(camera_type, false) : nullptr
+            );
+        }
     }
 }
 

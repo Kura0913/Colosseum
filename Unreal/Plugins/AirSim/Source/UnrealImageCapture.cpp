@@ -69,6 +69,7 @@ static void addNewRenderParamsCube(
     render_params.push_back(std::make_shared<RenderRequest::RenderParams>(capture, textureTarget, request.pixels_as_float, request.compress));
 }
 
+
 void UnrealImageCapture::getSceneCaptureImage(const std::vector<msr::airlib::ImageCaptureBase::ImageRequest>& requests,
                                               std::vector<msr::airlib::ImageCaptureBase::ImageResponse>& responses, bool use_safe_method) const
 {

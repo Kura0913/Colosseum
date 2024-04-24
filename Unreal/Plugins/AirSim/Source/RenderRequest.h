@@ -6,7 +6,6 @@
 #include "common/WorkerThread.hpp"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/SceneCaptureComponentCube.h"
-#include "Engine/GameViewportClient.h"
 #include <memory>
 #include "common/Common.hpp"
 #include "IImageWrapper.h"
@@ -61,7 +60,7 @@ public:
         // Cube.
         USceneCaptureComponentCube* const render_component_cube;
         UTextureRenderTargetCube* render_target_cube;
-        bool is_cube; // Set true for cube.
+        bool is_cube;// Set true for cube.
 
         RenderParams(USceneCaptureComponent2D* render_component_val, UTextureRenderTarget2D* render_target_val, bool pixels_as_float_val, bool compress_val)
             : render_component(render_component_val), render_target(render_target_val), pixels_as_float(pixels_as_float_val), compress(compress_val)

@@ -7,7 +7,6 @@
 #include "Engine/TextureRenderTargetCube.h"
 #include "Engine/World.h"
 #include "ImageUtils.h"
-
 #include <string>
 #include <exception>
 #include "AirBlueprintLib.h"
@@ -50,8 +49,9 @@ APIPCamera::APIPCamera(const FObjectInitializer& ObjectInitializer)
     image_type_to_pixel_format_map_.Add(Utils::toNumeric(ImageType::OpticalFlowVis), EPixelFormat::PF_B8G8R8A8);
 
     // Cube.
-    image_type_to_pixel_format_map_.Add(10, EPixelFormat::PF_B8G8R8A8);    // Cube scene.
-    image_type_to_pixel_format_map_.Add(11, EPixelFormat::PF_FloatRGBA);   // Cube depth.
+    image_type_to_pixel_format_map_.Add(Utils::toNumeric(ImageType::CubeScene), EPixelFormat::PF_B8G8R8A8);    // Cube scene.
+    image_type_to_pixel_format_map_.Add(Utils::toNumeric(ImageType::CubeSegmentation), EPixelFormat::PF_B8G8R8A8);    // Cube Segmentation
+    image_type_to_pixel_format_map_.Add(Utils::toNumeric(ImageType::CubeDepth), EPixelFormat::PF_FloatRGBA);   // Cube depth.
     object_filter_ = FObjectFilter();
 }
 
@@ -89,10 +89,14 @@ void APIPCamera::PostInitializeComponents()
     // Cube.
     captures_cube_.Init(nullptr, cubeTypeCount());
     render_targets_cube_.Init(nullptr, cubeTypeCount());
+
     captures_cube_[ImageCaptureBase::getCubeTypeIndex(ImageType::CubeScene)] =
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponentCube>(this, TEXT("CubeSceneCaptureComponent"));
+    captures_cube_[ImageCaptureBase::getCubeTypeIndex(ImageType::CubeSegmentation)] =
+        UAirBlueprintLib::GetActorComponent<USceneCaptureComponentCube>(this, TEXT("CubeSegmentationCaptureComponent"));
     captures_cube_[ImageCaptureBase::getCubeTypeIndex(ImageType::CubeDepth)] =
         UAirBlueprintLib::GetActorComponent<USceneCaptureComponentCube>(this, TEXT("CubeDepthCaptureComponent"));
+
 
     for (unsigned int i = 0; i < imageTypeCount(); ++i) {
         detections_[i] = NewObject<UDetectionComponent>(this);
@@ -111,7 +115,9 @@ void APIPCamera::BeginPlay()
     Super::BeginPlay();
 
     noise_materials_.AddZeroed(imageTypeCount2D() + 1);
+    noise_materials_.AddZeroed(cubeTypeCount() + 1);
     distortion_materials_.AddZeroed(imageTypeCount2D() + 1);
+    distortion_materials_.AddZeroed(cubeTypeCount() + 1);
 
     //by default all image types are disabled
     camera_type_enabled_.assign(imageTypeCount(), false);
@@ -451,10 +457,30 @@ void APIPCamera::setupCameraFromSettings(const APIPCamera::CameraSetting& camera
             }
             else {
                 const int cube_type = ImageCaptureBase::getCubeTypeIndex(image_type);
-                updateCaptureComponentSettingCube(captures_cube_[cube_type], render_targets_cube_[cube_type], false,
-                    image_type_to_pixel_format_map_[image_type], capture_setting,
-                    false);
-                // No noise setting for cubes.
+
+                switch (Utils::toEnum<ImageType>(image_type)) {
+                case ImageType::CubeScene:
+                    updateCaptureComponentSettingCube(captures_cube_[cube_type], render_targets_cube_[cube_type], false,
+                        image_type_to_pixel_format_map_[image_type], capture_setting, false);
+                    break;
+                case ImageType::CubeSegmentation:
+                    updateCaptureComponentSettingCube(captures_cube_[cube_type], render_targets_cube_[cube_type], false,
+                        image_type_to_pixel_format_map_[image_type], capture_setting, true);
+                    break;
+                case ImageType::CubeDepth:
+                    updateCaptureComponentSettingCube(captures_cube_[cube_type], render_targets_cube_[cube_type], false,
+                        image_type_to_pixel_format_map_[image_type], capture_setting, false);
+                    break;
+                default:
+                    updateCaptureComponentSettingCube(captures_cube_[cube_type], render_targets_cube_[cube_type], true,
+                        image_type_to_pixel_format_map_[image_type], capture_setting, false);
+                    break;
+                }
+
+                setDistortionMaterial(image_type, captures_cube_[cube_type], captures_cube_[cube_type]->PostProcessSettings);
+                setNoiseMaterial(image_type, captures_cube_[cube_type], captures_cube_[cube_type]->PostProcessSettings, noise_setting);
+                copyCameraSettingsToSceneCaptureCube(camera_, captures_cube_[cube_type]);
+                //No noise setting for cubes.
             }
             
         }
@@ -490,7 +516,7 @@ void APIPCamera::updateCaptureComponentSetting(USceneCaptureComponent2D* capture
 
     updateCameraPostProcessingSetting(capture->PostProcessSettings, setting);
 }
-
+// Cube
 void APIPCamera::updateCaptureComponentSettingCube(USceneCaptureComponentCube* capture, UTextureRenderTargetCube* render_target,
     bool auto_format, const EPixelFormat& pixel_format, const CaptureSetting& setting,
     bool force_linear_gamma) {
@@ -510,6 +536,8 @@ void APIPCamera::updateCaptureComponentSettingCube(USceneCaptureComponentCube* c
         render_target->TargetGamma = setting.target_gamma;
         // UE_LOG(LogTemp, Warning, TEXT("render_target->TargetGamma = %f. "), render_target->TargetGamma);
     }
+
+    updateCameraPostProcessingSetting(capture->PostProcessSettings, setting);
 }
 
 
@@ -708,6 +736,7 @@ USceneCaptureComponentCube* APIPCamera::getCaptureComponentCube(const APIPCamera
         return captures_cube_[cube_type];
     return nullptr;
 }
+
 
 USceneCaptureComponent* APIPCamera::getCaptureComponentGeneral(const APIPCamera::ImageType type, bool if_active)
 {
@@ -908,6 +937,27 @@ void APIPCamera::copyCameraSettingsToAllSceneCapture(UCameraComponent* camera)
 }
 
 void APIPCamera::copyCameraSettingsToSceneCapture(UCameraComponent* src, USceneCaptureComponent2D* dst)
+{
+    if (src && dst) {
+        dst->SetWorldLocationAndRotation(src->GetComponentLocation(), src->GetComponentRotation());
+
+        FMinimalViewInfo camera_view_info;
+        src->GetCameraView(/*DeltaTime =*/0.0f, camera_view_info);
+
+        const FPostProcessSettings& src_pp_settings = camera_view_info.PostProcessSettings;
+        FPostProcessSettings& dst_pp_settings = dst->PostProcessSettings;
+
+        FWeightedBlendables dst_weighted_blendables = dst_pp_settings.WeightedBlendables;
+
+        // Copy all of the post processing settings
+        dst_pp_settings = src_pp_settings;
+
+        // But restore the original blendables
+        dst_pp_settings.WeightedBlendables = dst_weighted_blendables;
+    }
+}
+// Cube
+void APIPCamera::copyCameraSettingsToSceneCaptureCube(UCameraComponent* src, USceneCaptureComponentCube* dst)
 {
     if (src && dst) {
         dst->SetWorldLocationAndRotation(src->GetComponentLocation(), src->GetComponentRotation());
